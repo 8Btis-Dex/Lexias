@@ -989,11 +989,13 @@ function registerEpubThemes(rendition){
   rendition.themes.register('dark', { body: { background: '#000000 !important', color: '#e6e6e6 !important' }, 'a, a:link': { color: '#8ecfff !important' } });
   rendition.themes.register('sepia', { body: { background: '#f4ecd8 !important', color: '#5b4636 !important' } });
   /* Portada, prólogo u otras páginas basadas en imagen/SVG: que se ajusten al visor
-     en vez de mostrarse en su tamaño original (chico) */
+     en vez de mostrarse en su tamaño original (chico), pero sin estirarse ni
+     deformarse más allá de su tamaño natural (eso las hacía verse enormes,
+     sobre todo en modo PC, y corría el contenido de texto sobre fondos oscuros) */
   rendition.themes.default({
     'img': { 'max-width': '100% !important', 'max-height': '100% !important', 'width': 'auto !important', 'height': 'auto !important', 'object-fit': 'contain !important' },
-    'svg': { 'max-width': '100% !important', 'max-height': '100% !important', 'width': '100% !important', 'height': '100% !important' },
-    'html, body': { 'height': '100% !important' }
+    'svg': { 'max-width': '100% !important', 'max-height': '100% !important', 'width': 'auto !important', 'height': 'auto !important' },
+    'html, body': { 'height': 'auto !important', 'min-height': '100% !important' }
   });
   rendition.themes.select(readingTheme);
 }
