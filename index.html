@@ -271,6 +271,7 @@
     flex-direction:column;
     align-items:center;
     padding:16px;
+    position:relative;
   }
   .reader-body canvas{
     box-shadow:0 4px 15px rgba(0,0,0,0.4);
@@ -284,6 +285,52 @@
     border-radius:6px;
     box-shadow:0 4px 15px rgba(0,0,0,0.4);
   }
+
+  .device-toggle{ display:flex; gap:4px; }
+  .device-btn{
+    background:none;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:5px 8px;
+    font-size:14px;
+    line-height:1;
+    cursor:pointer;
+    color:var(--text-soft);
+  }
+  .device-btn.active{
+    background:var(--navy);
+    color:var(--gold-light);
+    border-color:var(--navy);
+  }
+
+  .side-arrow{
+    display:none;
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    z-index:3;
+    width:44px;
+    height:44px;
+    border-radius:50%;
+    border:none;
+    background:rgba(0,0,0,0.35);
+    color:#fff;
+    font-size:22px;
+    line-height:1;
+    cursor:pointer;
+    align-items:center;
+    justify-content:center;
+  }
+  .side-arrow:hover{ background:rgba(0,0,0,0.55); }
+  .side-arrow:disabled{ opacity:.25; cursor:not-allowed; }
+  .side-arrow-left{ left:12px; }
+  .side-arrow-right{ right:12px; }
+
+  /* Modo PC: se muestran las flechas laterales y la imagen aprovecha más espacio */
+  .reader-box.device-pc .side-arrow{ display:flex; }
+  .reader-box.device-pc .reader-body{ padding:24px 64px; }
+  .reader-box.device-pc .reader-body canvas{ max-width:100%; max-height:80vh; }
+  .reader-box.device-pc #epubViewer{ height:78vh; }
   .reader-controls{
     display:flex;
     align-items:center;
@@ -355,6 +402,7 @@
   /* En pantalla completa solo se ve la X para salir: se ocultan título,
      selector de tema, botón de pantalla completa y la barra inferior de porcentaje */
   .reader-box.is-fullscreen #readerTitle,
+  .reader-box.is-fullscreen .device-toggle,
   .reader-box.is-fullscreen #themeSelector,
   .reader-box.is-fullscreen #fullscreenBtn,
   .reader-box.is-fullscreen .reader-controls,
@@ -559,6 +607,10 @@
     <div class="modal-header">
       <h3 id="readerTitle">Título del libro</h3>
       <div style="display:flex;align-items:center;gap:8px;">
+        <div class="device-toggle" title="Modo de visualización">
+          <button class="device-btn" id="deviceModePc" title="Modo PC">🖥️</button>
+          <button class="device-btn" id="deviceModeMobile" title="Modo celular/tablet">📱</button>
+        </div>
         <select id="themeSelector" title="Tema de lectura">
           <option value="light">☀️ Claro</option>
           <option value="dark">🌙 Oscuro</option>
@@ -575,8 +627,10 @@
       <a id="audioExternalLink" target="_blank" rel="noopener" style="display:none;">Abrir en la plataforma original ↗</a>
     </div>
     <div class="reader-body" id="readerBody">
+      <button class="side-arrow side-arrow-left" id="sideArrowPrev" title="Página anterior">‹</button>
       <canvas id="pdfCanvas"></canvas>
       <div id="epubViewer" style="display:none;"></div>
+      <button class="side-arrow side-arrow-right" id="sideArrowNext" title="Página siguiente">›</button>
     </div>
     <div class="reader-controls">
       <button id="prevPage">‹ Anterior</button>
@@ -880,6 +934,7 @@ async function openReader(book){
   currentFileType = book.fileType || 'pdf';
   document.getElementById('readerTitle').textContent = book.title;
   document.getElementById('readerModal').classList.add('active');
+  applyDeviceMode();
   setupAudioBar(book);
   document.getElementById('themeSelector').value = readingTheme;
 
@@ -899,6 +954,28 @@ async function openReader(book){
 
 /* ============ TEMA DE LECTURA (Claro / Oscuro / Sepia) ============ */
 let readingTheme = localStorage.getItem('lexia-theme') || 'light';
+
+/* ============ MODO DE VISUALIZACIÓN (PC / Celular-Tablet) ============ */
+let deviceMode = localStorage.getItem('lexia-device-mode') || (matchMedia('(pointer: fine)').matches ? 'pc' : 'mobile');
+
+function applyDeviceMode(){
+  const readerBox = document.querySelector('#readerModal .reader-box');
+  if (readerBox) readerBox.classList.toggle('device-pc', deviceMode === 'pc');
+  document.getElementById('deviceModePc').classList.toggle('active', deviceMode === 'pc');
+  document.getElementById('deviceModeMobile').classList.toggle('active', deviceMode === 'mobile');
+}
+applyDeviceMode();
+
+document.getElementById('deviceModePc').addEventListener('click', () => {
+  deviceMode = 'pc';
+  localStorage.setItem('lexia-device-mode', deviceMode);
+  applyDeviceMode();
+});
+document.getElementById('deviceModeMobile').addEventListener('click', () => {
+  deviceMode = 'mobile';
+  localStorage.setItem('lexia-device-mode', deviceMode);
+  applyDeviceMode();
+});
 
 function applyPdfTheme(theme){
   const canvas = document.getElementById('pdfCanvas');
@@ -1071,6 +1148,8 @@ async function renderPage(num){
   document.getElementById('pageIndicator').textContent = `${percent}% completado`;
   document.getElementById('prevPage').disabled = num <= 1;
   document.getElementById('nextPage').disabled = num >= currentPdfDoc.numPages;
+  document.getElementById('sideArrowPrev').disabled = num <= 1;
+  document.getElementById('sideArrowNext').disabled = num >= currentPdfDoc.numPages;
 
   saveProgress(currentBookId, num);
   savePercent(currentBookId, percent);
@@ -1080,6 +1159,8 @@ async function openEpubReader(book){
   document.getElementById('pageIndicator').textContent = 'Cargando EPUB…';
   document.getElementById('prevPage').disabled = true;
   document.getElementById('nextPage').disabled = true;
+  document.getElementById('sideArrowPrev').disabled = true;
+  document.getElementById('sideArrowNext').disabled = true;
 
   try {
     currentEpubBook = ePub(await getReadableFileUrl(book), { openAs: 'epub' });
@@ -1119,6 +1200,8 @@ async function openEpubReader(book){
 
     document.getElementById('prevPage').disabled = false;
     document.getElementById('nextPage').disabled = false;
+    document.getElementById('sideArrowPrev').disabled = false;
+    document.getElementById('sideArrowNext').disabled = false;
     document.getElementById('pageIndicator').textContent = 'Lectura de EPUB';
 
     currentEpubBook.locations.generate(1600).then(() => {
@@ -1158,6 +1241,12 @@ document.getElementById('nextPage').addEventListener('click', () => {
   } else if (currentPdfDoc && currentPage < currentPdfDoc.numPages){
     currentPage++; renderPage(currentPage);
   }
+});
+document.getElementById('sideArrowPrev').addEventListener('click', () => {
+  document.getElementById('prevPage').click();
+});
+document.getElementById('sideArrowNext').addEventListener('click', () => {
+  document.getElementById('nextPage').click();
 });
 
 /* Swipe táctil para pasar de página en PDF (EPUB usa su propio sistema de touch en epub.js) */
